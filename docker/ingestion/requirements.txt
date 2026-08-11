@@ -1,0 +1,5 @@
+# PostgreSQL driver
+#
+# Usado pelo script de carregamento dos CSVs.
+#
+psycopg[binary]>=3.2,<4

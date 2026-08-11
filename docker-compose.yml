@@ -1,0 +1,202 @@
+# ============================================================
+# LH NAUTICAL - DATA ENGINEERING 
+# ============================================================
+#
+# Serviços:
+#
+#   postgres
+#       Banco de dados PostgreSQL que armazenará os dados
+#       do projeto.
+#
+#   ingestion
+#       Container Python responsável pela geração do schema,
+#       ingestão dos CSVs e posteriormente outras tarefas
+#       de processamento.
+#
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # PostgreSQL
+  # ----------------------------------------------------------
+  #
+  # Responsável por armazenar os dados.
+  #
+  postgres:
+
+    # Imagem oficial do PostgreSQL.
+    image: postgres:18
+
+    # Nome fixo do container.
+    #
+    # Facilita comandos como:
+    #
+    # docker logs lh-nautical-postgres
+    #
+    container_name: lh-nautical-postgres
+
+    # Reinicia o container automaticamente caso ele pare
+    # inesperadamente.
+    restart: unless-stopped
+
+    # Variáveis utilizadas pela imagem oficial do PostgreSQL.
+    environment:
+
+      # Nome do banco de dados.
+      POSTGRES_DB: ${POSTGRES_DB}
+
+      # Usuário administrador do banco.
+      POSTGRES_USER: ${POSTGRES_USER}
+
+      # Senha.
+      #
+      # A senha não deve ficar diretamente no docker-compose.yml.
+      # Ela será obtida do arquivo .env.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    # Portas:
+    #
+    # HOST:CONTAINER
+    #
+    # Permite acessar o PostgreSQL do computador host através
+    # da porta 5432.
+    ports:
+      - "${POSTGRES_PORT}:5432"
+
+    # Volume persistente.
+    #
+    # Sem esse volume, os dados desapareceriam quando o
+    # container fosse removido.
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+    # Healthcheck.
+    #
+    # O Docker verifica se o PostgreSQL realmente está pronto
+    # para aceitar conexões.
+    healthcheck:
+
+      # pg_isready retorna sucesso quando o PostgreSQL
+      # está aceitando conexões.
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+        ]
+
+      # Intervalo entre verificações.
+      interval: 5s
+
+      # Tempo máximo de cada verificação.
+      timeout: 5s
+
+      # Quantidade de tentativas antes de considerar
+      # o serviço unhealthy.
+      retries: 10
+
+      # Tempo inicial antes de começar o healthcheck.
+      start_period: 10s
+
+
+  # ----------------------------------------------------------
+  # INGESTION
+  # ----------------------------------------------------------
+  #
+  # Container Python responsável pela parte de engenharia
+  # de dados.
+  #
+  # Inicialmente:
+  #
+  #   - gerar schema.sql
+  #   - carregar CSVs
+  #
+  # Posteriormente podemos adicionar:
+  #
+  #   - validações
+  #   - data quality
+  #   - transformações
+  #   - geração de marts
+  #
+  ingestion:
+
+    # A imagem será construída utilizando nosso Dockerfile.
+    build:
+
+      # Contexto do build.
+      #
+      # Usamos "." porque o Dockerfile precisará acessar
+      # diretórios como src/, sql/ etc.
+      context: .
+
+      # Local do Dockerfile.
+      dockerfile: docker/ingestion/Dockerfile
+
+    # Nome do container.
+    container_name: lh-nautical-ingestion
+
+    # O ingestion depende do PostgreSQL.
+    #
+    # Importante:
+    #
+    # condition: service_healthy
+    #
+    # significa que o Python só será iniciado depois que
+    # o PostgreSQL estiver efetivamente saudável.
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    # Variáveis de ambiente utilizadas pelo Python.
+    environment:
+
+      # Host do PostgreSQL.
+      #
+      # Dentro da rede Docker NÃO usamos localhost.
+      #
+      # "postgres" é o nome do serviço definido acima.
+      DB_HOST: postgres
+
+      DB_PORT: 5432
+
+      DB_NAME: ${POSTGRES_DB}
+
+      DB_USER: ${POSTGRES_USER}
+
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+
+    # Montagem dos diretórios.
+    #
+    # Isso permite que os arquivos existentes no host
+    # sejam disponibilizados dentro do container.
+    volumes:
+
+      # CSVs.
+      - ./data:/app/data
+
+      # Código Python.
+      - ./src:/app/src
+
+      # Scripts SQL.
+      - ./sql:/app/sql
+
+      # Resultados gerados.
+      - ./outputs:/app/outputs
+
+    # Mantém o container disponível para execução manual.
+    #
+    # Isso é útil durante desenvolvimento.
+    command: ["tail", "-f", "/dev/null"]
+
+
+# ============================================================
+# VOLUMES
+# ============================================================
+#
+# Volumes gerenciados pelo Docker.
+#
+# PostgreSQL utilizará esse volume para persistir os dados.
+#
+volumes:
+
+  postgres_data:
