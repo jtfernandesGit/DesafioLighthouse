@@ -188,7 +188,66 @@ services:
     # Isso é útil durante desenvolvimento.
     command: ["tail", "-f", "/dev/null"]
 
+  # ----------------------------------------------------------
+  # FORECASTING
+  # ----------------------------------------------------------
+  #
+  # Container Python responsável pela parte de previsão.
+  #
+  forecasting:
+    build:
+      context: ./forecasting
+      dockerfile: Dockerfile
 
+    container_name: lh-nautical-forecasting
+
+    ports:
+      - "8888:8888"
+
+    volumes:
+      - ./notebooks:/workspace/notebooks
+      - ./data:/workspace/data
+      - ./forecasting/src:/workspace/forecasting/src
+
+    working_dir: /workspace
+
+  recommendation:
+    build:
+      context: ./recommendation
+      dockerfile: Dockerfile
+
+    container_name: lh-nautical-recommendation
+
+    ports:
+      - "8889:8888"
+
+    volumes:
+      - ./notebooks:/workspace/notebooks
+      - ./data:/workspace/data
+      - ./recommendation/src:/workspace/recommendation/src
+
+    working_dir: /workspace
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+
+    container_name: lh-nautical-dashboard
+
+    ports:
+    - "8501:8501"
+
+    volumes:
+    - ./data:/workspace/data
+
+    working_dir: /workspace
+
+    depends_on:
+    - forecasting
+    - recommendation
+
+    restart: unless-stopped
 # ============================================================
 # VOLUMES
 # ============================================================
@@ -200,3 +259,4 @@ services:
 volumes:
 
   postgres_data:
+
