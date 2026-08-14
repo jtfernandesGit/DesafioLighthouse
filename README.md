@@ -59,3 +59,11 @@ Pipeline planejado para o projeto
     -d lh_nautical \
     -c "SELECT COUNT(*) FROM raw.customers;"`
 
+#### Acesso Jupyter - Previsão de demanda (porta 8888)
+`docker logs lh-nautical-forecasting`
+
+#### Acesso Jupyter - Sistema de recomendação (porta 8889)
+`docker logs lh-nautical-recommendation`
+
+#### Acesso Dashboard 
+http://localhost:8501/
